@@ -9,12 +9,13 @@ from logreg.models import Irl_Net  # noqa
 
 def main(usr_id):
     mapping = Map_StateValue(
-        weight_path="IRL/weight_vec/final_model_weights.pt",
+        weight_path="/Users/uemuraminato/Desktop/IRL/weight_vec/final_model_weights.pt",
         usr_id=usr_id,
-        TimeThreshold=50,  # どこのタイミングまでを切るか
+        TimeThreshold=50,
+        DiffThreshold=0.02,  # どこのタイミングまでを切るか
     )
     mapping.excute(
-        state_path=f"IRL/book_script/analysis/preprocessed/state_tras_of_{usr_id}.npy"  # noqa
+        state_path=f"/Users/uemuraminato/Desktop/book_script/analysis/preprocessed/state_tras_of_{usr_id}.npy"  # noqa
     )
 
 

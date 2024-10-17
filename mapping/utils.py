@@ -3,6 +3,7 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn.functional as F  # noqa
 
@@ -12,11 +13,12 @@ from logreg.models import Irl_Net  # noqa
 
 
 class Map_StateValue:
-    def __init__(self, weight_path: str, usr_id: str, TimeThreshold: int):
+    def __init__(self, weight_path: str, usr_id: str, TimeThreshold: int, DiffThreshold: float):
         super().__init__()
         self.weight_path = weight_path
         self.usr_id = usr_id
         self.TimeThreshold = TimeThreshold
+        self.DiffThreshold = DiffThreshold
         if torch.backends.mps.is_available:
             self.device = "mps"
         else:
@@ -34,6 +36,8 @@ class Map_StateValue:
         self.model.eval()
         self.state_values = []
         prev_state_reward = np.array(1, dtype=np.float32)
+        over_threshold_data = pd.DataFrame({"IND": [0], "StateValue": [0]})
+        ind = 0
         with torch.no_grad():
             for state in self.state_trans:
                 state, next_state, sources = make_test_dataset(state)  # noqa
@@ -43,9 +47,16 @@ class Map_StateValue:
                 state_value = state_value.squeeze(0).squeeze(0)
                 state_value = state_value.cpu().detach().numpy()
                 diff_state_value = state_value - prev_state_reward
+                if np.abs(diff_state_value) >= np.abs(self.DiffThreshold):
+                    new_row = pd.DataFrame({"IND": ind, "StateValue": diff_state_value}, index=[0])
+                    over_threshold_data = pd.concat(
+                        [over_threshold_data, new_row], ignore_index=True
+                    )
                 self.state_values.append(diff_state_value)
                 prev_state_reward = state_value
+                ind += 1
         self.map_state_value()
+        over_threshold_data.to_csv(f"/Users/uemuraminato/Desktop/IRL/mapping/Ind/{self.usr_id}.csv")
 
     def map_state_value(self):
         timestep = list(range(len(self.state_trans)))
@@ -60,7 +71,7 @@ class Map_StateValue:
         plt.xlabel("Time Step")
         plt.ylabel("State Value")
         plt.grid(True)
-        plt.savefig(f"mapping/figure/state_value_{self.usr_id}.png")
+        plt.savefig(f"/Users/uemuraminato/Desktop/IRL/mapping/figure/state_value_{self.usr_id}.png")
 
     def calculate_state_space(self):
         state = self.state_trans[0]
