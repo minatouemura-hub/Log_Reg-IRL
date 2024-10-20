@@ -1,4 +1,5 @@
 import os
+import pickle
 import sys
 
 import matplotlib.pyplot as plt
@@ -13,9 +14,17 @@ from logreg.models import Irl_Net  # noqa
 
 
 class Map_StateValue:
-    def __init__(self, weight_path: str, usr_id: str, TimeThreshold: int, DiffThreshold: float):
+    def __init__(
+        self,
+        weight_path: str,
+        pickel_path: str,
+        usr_id: str,
+        TimeThreshold: int,
+        DiffThreshold: float,
+    ):
         super().__init__()
         self.weight_path = weight_path
+        self.pickel_path = pickel_path
         self.usr_id = usr_id
         self.TimeThreshold = TimeThreshold
         self.DiffThreshold = DiffThreshold
@@ -47,23 +56,31 @@ class Map_StateValue:
                 state_value = state_value.squeeze(0).squeeze(0)
                 state_value = state_value.cpu().detach().numpy()
                 diff_state_value = state_value - prev_state_reward
-                if np.abs(diff_state_value) >= np.abs(self.DiffThreshold):
+                if np.abs(diff_state_value) >= np.abs(self.DiffThreshold) and (
+                    self.TimeThreshold < ind
+                ):
                     new_row = pd.DataFrame({"IND": ind, "StateValue": diff_state_value}, index=[0])
                     over_threshold_data = pd.concat(
                         [over_threshold_data, new_row], ignore_index=True
                     )
-                self.state_values.append(diff_state_value)
+                # self.state_values.append(diff_state_value)
+                self.state_values.append(state_value)
                 prev_state_reward = state_value
                 ind += 1
         self.map_state_value()
-        over_threshold_data.to_csv(f"/Users/uemuraminato/Desktop/IRL/mapping/Ind/{self.usr_id}.csv")
+        over_threshold_data = over_threshold_data.iloc[1:]  # noqa
+        over_threshold_data.to_csv(
+            f"/Users/uemuraminato/Desktop/IRL/mapping/Ind/{self.usr_id}.csv", index=False
+        )
 
     def map_state_value(self):
-        timestep = list(range(len(self.state_trans)))
+        self.load_chase_index()
+        timestep = np.array(list(range(len(self.state_trans))))
+        state_values = np.array(self.state_values)
         plt.figure(figsize=(10, 6))
         plt.plot(
-            timestep[self.TimeThreshold :],  # noqa
-            self.state_values[self.TimeThreshold :],  # noqa
+            timestep[self.TimeThreshold :][self.chase_index],  # noqa
+            state_values[self.TimeThreshold :][self.chase_index],  # noqa
             linestyle="-",
             color="b",  # noqa
         )
@@ -83,3 +100,8 @@ class Map_StateValue:
                 return state.shape[0] * state.shape[1]
         else:
             raise ValueError("Unexpected type or structure for state column")
+
+    def load_chase_index(self, target=1):
+        with open(self.pickel_path, "rb") as f:
+            loaded_group = pickle.load(f)
+        self.chase_index = sorted(loaded_group[target], reverse=False)

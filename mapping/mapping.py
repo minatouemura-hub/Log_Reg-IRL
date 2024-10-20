@@ -10,8 +10,9 @@ from logreg.models import Irl_Net  # noqa
 def main(usr_id):
     mapping = Map_StateValue(
         weight_path="/Users/uemuraminato/Desktop/IRL/weight_vec/final_model_weights.pt",
+        pickel_path="/Users/uemuraminato/Desktop/book_script/filtered_groups.pkl",
         usr_id=usr_id,
-        TimeThreshold=50,
+        TimeThreshold=0,
         DiffThreshold=0.02,  # どこのタイミングまでを切るか
     )
     mapping.excute(
