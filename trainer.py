@@ -37,10 +37,10 @@ class Train_Irl_model(Module):
         print(f"----Training on {self.device}----")
 
         # データのload
-        expert_path = "/Users/uemuraminato/Desktop/book_script/analysis/preprocessed/state_tras_of_{}.npy".format(  # noqa
+        expert_path = "/Users/uemuraminato/Desktop/book_script/analysis/preproceed/state_tras_of_{}.npy".format(  # noqa
             self.expert_id
         )
-        BathPath = "/Users/uemuraminato/Desktop/book_script/analysis/preprocessed/"
+        BathPath = "/Users/uemuraminato/Desktop/book_script/analysis/preproceed"
         combined_dataset = make_irl_dataset(expert_path=expert_path, BasePath=BathPath)
         book_dataset = BookDataset(combined_dataset)
         self.state_space = book_dataset.calculate_state_space

@@ -4,11 +4,13 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
+import pandas as pd  # noqa
 import torch
 import torch.nn.functional as F  # noqa
+from scipy.stats import linregress
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from develop.data import make_test_dataset  # noqa
 from logreg.models import Irl_Net  # noqa
 
@@ -50,7 +52,7 @@ class Map_StateValue:
         with torch.no_grad():
             for state in self.state_trans:
                 state, next_state, sources = make_test_dataset(state)  # noqa
-                state = F.pad(state, (0, 0, 0, 505 - state.shape[0]))
+                state = F.pad(state, (0, 0, 0, 79 - state.shape[0]))
                 state = state.unsqueeze(0).unsqueeze(0).to(self.device)
                 state_value = self.model.reward_net(state)
                 state_value = state_value.squeeze(0).squeeze(0)
@@ -59,28 +61,61 @@ class Map_StateValue:
                 if np.abs(diff_state_value) >= np.abs(self.DiffThreshold) and (
                     self.TimeThreshold < ind
                 ):
-                    new_row = pd.DataFrame({"IND": ind, "StateValue": diff_state_value}, index=[0])
+                    new_row = pd.DataFrame(
+                        {"IND": ind, "StateValue": diff_state_value}, index=[0]
+                    )  # noqa
                     over_threshold_data = pd.concat(
                         [over_threshold_data, new_row], ignore_index=True
                     )
-                # self.state_values.append(diff_state_value)
-                self.state_values.append(state_value)
+                self.state_values.append(diff_state_value)
+                # self.state_values.append(state_value)
                 prev_state_reward = state_value
                 ind += 1
-        self.map_state_value()
+        # self.map_correlation()
+        self.map_diff_state_value()
         over_threshold_data = over_threshold_data.iloc[1:]  # noqa
         over_threshold_data.to_csv(
             f"/Users/uemuraminato/Desktop/IRL/mapping/Ind/{self.usr_id}.csv", index=False
         )
 
-    def map_state_value(self):
-        self.load_chase_index()
+    def map_correlation(self):
+        state_values = np.array(self.state_values)
+        state_values = state_values[self.TimeThreshold :]  # noqa
+
+        # x: SV_{t-1}, y: SV_{t}
+        x = state_values[: len(state_values) - 1]
+        y = state_values[1:]
+
+        # 相関係数の計算
+        correlation = np.corrcoef(x, y)[0, 1]
+        print(f"相関係数: {correlation}")
+
+        # 回帰直線の計算
+        slope, intercept, r_value, p_value, std_err = linregress(x, y)
+
+        # 散布図の作成
+        plt.figure(figsize=(10, 6))
+        plt.scatter(x, y, marker="o", label="Data points")
+
+        # 回帰直線の描画
+        plt.plot(x, slope * x + intercept, color="red", label=f"y = {slope:.2f}x + {intercept:.2f}")
+
+        # グラフの設定
+        plt.title(f"Correlation of difference (SV_t - SV_t-1), r={correlation:.2f}")
+        plt.xlabel("DiffStateValue_t-1")
+        plt.ylabel("DiffStateValue_t")
+        plt.grid(True)
+        plt.legend()
+        plt.show()
+
+    def map_diff_state_value(self):
+        # self.load_chase_index()
         timestep = np.array(list(range(len(self.state_trans))))
         state_values = np.array(self.state_values)
         plt.figure(figsize=(10, 6))
         plt.plot(
-            timestep[self.TimeThreshold :][self.chase_index],  # noqa
-            state_values[self.TimeThreshold :][self.chase_index],  # noqa
+            timestep[self.TimeThreshold :],  # [self.chase_index],  # noqa
+            state_values[self.TimeThreshold :],  # [self.chase_index],  # noqa
             linestyle="-",
             color="b",  # noqa
         )
