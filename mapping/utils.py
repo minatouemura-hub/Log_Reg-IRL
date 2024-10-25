@@ -109,17 +109,17 @@ class Map_StateValue:
         plt.show()
 
     def map_diff_state_value(self):
-        # self.load_chase_index()
+        self.load_chase_index()
         timestep = np.array(list(range(len(self.state_trans))))
         state_values = np.array(self.state_values)
         plt.figure(figsize=(10, 6))
         plt.plot(
-            timestep[self.TimeThreshold :],  # [self.chase_index],  # noqa
-            state_values[self.TimeThreshold :],  # [self.chase_index],  # noqa
+            timestep[self.TimeThreshold :][self.chase_index],  # noqa
+            state_values[self.TimeThreshold :][self.chase_index],  # noqa
             linestyle="-",
             color="b",  # noqa
         )
-        plt.title(f"State Value over time of {self.usr_id}")
+        plt.title(f"State Value of over 0.6_cos_similality:{self.usr_id}")
         plt.xlabel("Time Step")
         plt.ylabel("State Value")
         plt.grid(True)
@@ -136,7 +136,7 @@ class Map_StateValue:
         else:
             raise ValueError("Unexpected type or structure for state column")
 
-    def load_chase_index(self, target=1):
+    def load_chase_index(self, target=0):
         with open(self.pickel_path, "rb") as f:
             loaded_group = pickle.load(f)
         self.chase_index = sorted(loaded_group[target], reverse=False)
