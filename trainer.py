@@ -19,7 +19,7 @@ from logreg.modules import negative_log_likelihood  # noqa: E402
 
 
 class Train_Irl_model(Module):
-    def __init__(self, num_epoch, expert_id, gamma=0.95, lambda_reg=0.01, lr=0.001):
+    def __init__(self, num_epoch, expert_id, gamma=0.95, lambda_reg=0.01, lr=0.01):
         super().__init__()
         if torch.backends.mps.is_available:
             self.device = "mps"
@@ -79,7 +79,9 @@ class Train_Irl_model(Module):
                     print(f"Batch {epoch + 1}: Exception occurred - {str(e)}")
         self.plot_losses()
         # トレーニングが終了したら、最終エポックのモデルの重みを保存
-        torch.save(self.irl_model.state_dict(), "weight_vec/final_model_weights.pt")
+        torch.save(
+            self.irl_model.state_dict(), f"weight_vec/final_model_weights_{self.expert_id}.pt"
+        )
 
     def train_one_step(self):
         with tqdm(total=len(self.dataloader), desc="Train_one_step", leave=False) as pbar:

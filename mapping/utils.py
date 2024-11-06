@@ -11,6 +11,8 @@ from scipy.stats import linregress
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from sklearn.preprocessing import MinMaxScaler  # noqa
+
 from develop.data import make_test_dataset  # noqa
 from logreg.models import Irl_Net  # noqa
 
@@ -20,6 +22,7 @@ class Map_StateValue:
         self,
         weight_path: str,
         pickel_path: str,
+        manneri_path: str,
         usr_id: str,
         TimeThreshold: int,
         DiffThreshold: float,
@@ -27,6 +30,7 @@ class Map_StateValue:
         super().__init__()
         self.weight_path = weight_path
         self.pickel_path = pickel_path
+        self.manneri_path = manneri_path
         self.usr_id = usr_id
         self.TimeThreshold = TimeThreshold
         self.DiffThreshold = DiffThreshold
@@ -52,7 +56,7 @@ class Map_StateValue:
         with torch.no_grad():
             for state in self.state_trans:
                 state, next_state, sources = make_test_dataset(state)  # noqa
-                state = F.pad(state, (0, 0, 0, 79 - state.shape[0]))
+                state = F.pad(state, (0, 0, 0, 214 - state.shape[0]))
                 state = state.unsqueeze(0).unsqueeze(0).to(self.device)
                 state_value = self.model.reward_net(state)
                 state_value = state_value.squeeze(0).squeeze(0)
@@ -109,20 +113,42 @@ class Map_StateValue:
         plt.show()
 
     def map_diff_state_value(self):
-        self.load_chase_index()
-        timestep = np.array(list(range(len(self.state_trans))))
-        state_values = np.array(self.state_values)
+        # self.chase_index = self.load_chase_index()
+        manneri_vec = pd.read_csv(self.manneri_path)
+        manneri_vec = -manneri_vec
+        state_values = self.state_values[self.TimeThreshold :]  # noqa
+        # timestep = np.array(list(range(len(self.state_trans[self.chase_index]))))
+        timestep = np.array(list(range(len(state_values))))
+        state_values = np.array(state_values)
+        # state_values = state_values[self.chase_index]
+
+        # state_valuesの正規化
+        state_values = np.array(state_values)
+        state_values = state_values.reshape(-1, 1)
+        scaler = MinMaxScaler(feature_range=(0, 1))
+        state_values_normalized = scaler.fit_transform(state_values).flatten()
+
+        # manneri_vecの正規化
+        manneri_vec = manneri_vec.loc[self.TimeThreshold :, ["MD"]]  # noqa
+        manneri_values = manneri_vec["MD"].values.reshape(-1, 1)
+        manneri_values_normalized = scaler.fit_transform(manneri_values).flatten()
         plt.figure(figsize=(10, 6))
         plt.plot(
-            timestep[self.TimeThreshold :][self.chase_index],  # noqa
-            state_values[self.TimeThreshold :][self.chase_index],  # noqa
+            timestep,  # noqa
+            state_values_normalized,  # noqa
             linestyle="-",
-            color="b",  # noqa
+            color="b",
         )
-        plt.title(f"State Value of over 0.6_cos_similality:{self.usr_id}")
+        plt.plot(
+            timestep,  # noqa
+            manneri_values_normalized,  # noqa
+            linestyle="-",
+            color="red",
+        )
+        plt.title(f"State Value and Manneri:{self.usr_id}")
         plt.xlabel("Time Step")
-        plt.ylabel("State Value")
         plt.grid(True)
+        plt.show()
         plt.savefig(f"/Users/uemuraminato/Desktop/IRL/mapping/figure/state_value_{self.usr_id}.png")
 
     def calculate_state_space(self):
@@ -139,4 +165,5 @@ class Map_StateValue:
     def load_chase_index(self, target=0):
         with open(self.pickel_path, "rb") as f:
             loaded_group = pickle.load(f)
-        self.chase_index = sorted(loaded_group[target], reverse=False)
+        chase_index = sorted(loaded_group[target], reverse=False)
+        return chase_index
