@@ -3,7 +3,7 @@ from trainer import Train_Irl_model
 
 
 def main():
-    train_model = Train_Irl_model(num_epoch=70, expert_id="1087619")
+    train_model = Train_Irl_model(num_epoch=50, group="F", expert_id="283246")
     train_model.train()
 
 

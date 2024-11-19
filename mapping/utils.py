@@ -21,7 +21,6 @@ class Map_StateValue:
     def __init__(
         self,
         weight_path: str,
-        pickel_path: str,
         manneri_path: str,
         usr_id: str,
         TimeThreshold: int,
@@ -29,7 +28,6 @@ class Map_StateValue:
     ):
         super().__init__()
         self.weight_path = weight_path
-        self.pickel_path = pickel_path
         self.manneri_path = manneri_path
         self.usr_id = usr_id
         self.TimeThreshold = TimeThreshold

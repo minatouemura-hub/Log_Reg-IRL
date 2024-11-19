@@ -1,1 +1,6 @@
 parser/
+plot/
+dataset/
+weight_vec/
+mapping/figure/
+mapping/ind/

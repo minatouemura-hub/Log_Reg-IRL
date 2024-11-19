@@ -12,8 +12,7 @@ from logreg.models import Irl_Net  # noqa
 def main(usr_id):
     mapping = Map_StateValue(
         weight_path="/Users/uemuraminato/Desktop/IRL/weight_vec/final_model_weights.pt",
-        pickel_path="/Users/uemuraminato/Desktop/book_script/filtered_groups.pkl",
-        manneri_path="/Users/uemuraminato/Desktop/book_script/manneri_vec/manneri_1087619.csv",
+        manneri_path=f"/Users/uemuraminato/Desktop/book_script/manneri_vec/manneri_{usr_id}.csv",
         usr_id=usr_id,
         TimeThreshold=5,
         DiffThreshold=0.02,  # どこのタイミングまでを切るか

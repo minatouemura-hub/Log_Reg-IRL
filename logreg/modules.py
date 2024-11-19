@@ -8,13 +8,13 @@ import torch.nn.functional as F
 
 
 def negative_log_likelihood(outputs, labels, model, lambda_reg):
-    Nb = (labels == 0).sum().item()
     Ne = (labels == 1).sum().item()
+    Nb = (labels == -1).sum().item()
     if Nb == 0 or Ne == 0:
-        return None
-    baseline_ll = -(1 / Nb) * torch.sum(torch.log(torch.sigmoid(-outputs[labels == 0])))
+        raise ValueError(f"No Data from {Nb}/{Ne}")
+    # エキスパートが0でベースラインが1
     expert_ll = -(1 / Ne) * torch.sum(torch.log(torch.sigmoid(outputs[labels == 1])))
-
+    baseline_ll = -(1 / Nb) * torch.sum(torch.log(torch.sigmoid(-outputs[labels == -1])))
     # L2 正則化項の計算
     regularization = 0
     for wx in model.parameters():
@@ -65,7 +65,7 @@ class Density_Ratio_Net(nn.Module):
             in_channels=64, out_channels=64, kernel_size=3, stride=1, padding=1
         ).to(self.device)
         self.flatten = nn.Flatten(start_dim=1)
-        self.fc1 = nn.Linear(9984, 512).to(self.device)
+        self.fc1 = nn.Linear(9216, 512).to(self.device)
         self.fc2 = nn.Linear(512, 1).to(self.device)
 
     def forward(self, x):
@@ -94,7 +94,7 @@ class Reward_Net(nn.Module):
         ).to(device)
 
         self.flatten = nn.Flatten(start_dim=1)
-        self.fc1 = nn.Linear(9984, 512).to(self.device)
+        self.fc1 = nn.Linear(9216, 512).to(self.device)
 
         self.fc2 = nn.Linear(512, 1).to(self.device)
 
@@ -124,7 +124,7 @@ class State_Value_Net(nn.Module):
             in_channels=64, out_channels=64, kernel_size=3, stride=1, padding=1
         ).to(self.device)
         self.flatten = nn.Flatten(start_dim=1)
-        self.fc1 = nn.Linear(9984, 512).to(self.device)
+        self.fc1 = nn.Linear(9216, 512).to(self.device)
         self.fc2 = nn.Linear(512, 1).to(self.device)
 
     def forward(self, x):

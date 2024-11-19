@@ -5,10 +5,10 @@ import pandas as pd
 import torch
 
 
-def make_irl_dataset(BasePath, expert_path):
+def make_irl_dataset(BasePath, expert_path, max_num):
     expert_trans = np.load(expert_path)
     # ディレクトリ内の全ての.npyファイルを取得し、特定のファイルを除外
-    baseline_files = load_npy_files(BasePath, exclude=expert_path)
+    baseline_files = load_npy_files(BasePath, exclude=expert_path, max_num=max_num)
     baseline_trans = pad_npy_files(baseline_files)
     expert_next_state = np.roll(expert_trans, shift=-1, axis=0)
     expert_next_state[-1] = np.zeros_like(expert_trans[-1])
@@ -19,25 +19,26 @@ def make_irl_dataset(BasePath, expert_path):
     baseline_pairs = [
         (baseline_trans[i], baseline_next_state[i]) for i in range(len(baseline_trans))
     ]
-    expert_dataset = [(state, next_state, 0) for state, next_state in expert_pairs]
-    baseline_dataset = [(state, next_state, 1) for state, next_state in baseline_pairs]
+    expert_dataset = [(state, next_state, 1) for state, next_state in expert_pairs]
+    baseline_dataset = [(state, next_state, -1) for state, next_state in baseline_pairs]
     comb_dataset = expert_dataset + baseline_dataset
 
     return pd.DataFrame(comb_dataset, columns=["state", "next_state", "source"])
 
 
-def load_npy_files(directory, exclude):
+def load_npy_files(directory, exclude: str, max_num: int = 100):
     npy_files = []
-
+    count = 0
     # ディレクトリ内のファイルをチェック
     for filename in os.listdir(directory):
         # .npyファイルかつ指定された除外条件に一致しない場合
         if filename.endswith(".npy") and exclude not in filename:
             file_path = os.path.join(directory, filename)
             data = np.load(file_path)
-
+            if count >= max_num:
+                break
             npy_files.append(data)
-
+            count += 1
     return npy_files
 
 

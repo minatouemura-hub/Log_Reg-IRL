@@ -5,7 +5,8 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 import torch
-from torch.utils.data import Dataset
+import torch.nn.functional as F
+from torch.utils.data import Dataset, WeightedRandomSampler
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -23,6 +24,23 @@ def custom_collate_fun(batch):
     return states_padded, next_states_padded, sources_tensor
 
 
+def create_balanced_sampler(dataset):
+    # ラベルを取得
+    labels = dataset.data["source"]
+
+    # クラスごとのサンプル数を計算して逆数をクラス重みとして設定
+    class_counts = labels.value_counts()
+    class_weights = 1.0 / class_counts
+
+    # 各サンプルの重みを設定
+    sample_weights = labels.map(class_weights).values
+
+    # サンプラーの作成
+    return WeightedRandomSampler(
+        weights=sample_weights, num_samples=len(sample_weights), replacement=True
+    )
+
+
 class BookDataset(Dataset):
     def __init__(self, dataset: pd.DataFrame):
         self.data = dataset
@@ -38,6 +56,11 @@ class BookDataset(Dataset):
         state_tensor = torch.tensor(state, dtype=torch.float32)
         next_state_tensor = torch.tensor(next_state, dtype=torch.float32)
         source_tensor = torch.tensor(source, dtype=torch.int64)
+        # データの形状が200になるように修正
+        state_tensor = self.pad_to_shape(state_tensor, (200, 200, 50))
+        next_state_tensor = self.pad_to_shape(next_state_tensor, (200, 200, 50))
+
+        source_tensor = torch.tensor(source, dtype=torch.int64)
         return state_tensor, next_state_tensor, source_tensor
 
     @property
@@ -47,7 +70,7 @@ class BookDataset(Dataset):
 
     @property
     def get_source_ratio(self):
-        return np.float32(self.source_counts[1] / self.source_counts[0])
+        return np.float32(self.source_counts[-1] / self.source_counts[1])
 
     @property
     def StateSize(self):
@@ -67,6 +90,16 @@ class BookDataset(Dataset):
                 return state.shape[0] * state.shape[1]
         else:
             raise ValueError("Unexpected type or structure for state column")
+
+    def pad_to_shape(
+        self, tensor: torch.Tensor, target_shape: Tuple[int, int, int]
+    ) -> torch.Tensor:
+        # 各次元のパディングサイズを計算
+        padding = []
+        for current, target in zip(tensor.shape[::-1], target_shape[::-1]):
+            pad_size = target - current
+            padding.extend([0, pad_size])  # (前, 後) の順でパディング
+        return F.pad(tensor, padding, "constant", 0)
 
 
 def main():
