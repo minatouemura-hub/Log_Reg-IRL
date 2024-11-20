@@ -60,7 +60,7 @@ class Train_Irl_model(Module):
         # 設定&データの処理
         expert_path = self.search_ExpertPath(self.expert_id)
         BathPath = f"/Users/uemuraminato/Desktop/book_script/vec/preproceed/{self.group}/"
-        combined_dataset = make_irl_dataset(expert_path=expert_path, BasePath=BathPath, max_num=30)
+        combined_dataset = make_irl_dataset(expert_path=expert_path, BasePath=BathPath, max_num=35)
         train_data, test_data = train_test_split(
             combined_dataset, test_size=0.2, stratify=combined_dataset["source"]
         )
@@ -217,11 +217,14 @@ class Train_Irl_model(Module):
         data = pd.DataFrame({"Score": score, "Category": category})
         plt.figure(figsize=(8, 6))
         sns.violinplot(x="Category", y="Score", data=data, color="gray", inner="box")
-        plt.title(f"Violin Plot of Scores of {self.expert_id} in {self.group}")
+        plt.title(f"Violin Plot of Scores in {self.group}")
         plt.xlabel("Category")
         plt.ylabel("Score")
-        plt.savefig(f"plot/{self.group}_{self.expert_id}_violinplot.png")
+        if not os.path.exists(f"plot/{self.expert_id}"):
+            os.makedirs(f"plot/{self.expert_id}")
+        plt.savefig(f"plot/{self.expert_id}/{self.group}_violinplot.png")
         plt.show()
+        plt.close()
 
     def plot_losses(self):
         # デバイスの確認（デバッグ用）
@@ -232,6 +235,7 @@ class Train_Irl_model(Module):
         plt.title("Training Loss Over Time")
         plt.legend()
         plt.show()
+        plt.close()
 
     # def get_gender_label(self, target_id: str):
     #     target_dir_path = ""
