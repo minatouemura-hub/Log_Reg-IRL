@@ -60,11 +60,11 @@ class Train_Irl_model(Module):
         # 設定&データの処理
         expert_path = self.search_ExpertPath(self.expert_id)
         BathPath = f"/Users/uemuraminato/Desktop/book_script/vec/preproceed/{self.group}/"
-        combined_dataset = make_irl_dataset(expert_path=expert_path, BasePath=BathPath, max_num=35)
+        combined_dataset = make_irl_dataset(expert_path=expert_path, BasePath=BathPath, max_num=20)
         train_data, test_data = train_test_split(
             combined_dataset, test_size=0.2, stratify=combined_dataset["source"]
         )
-        train_dataset = BookDataset(train_data)  # 入力データの長さを200に揃える処理を入れたい
+        train_dataset = BookDataset(train_data)
         self.test_dataset = BookDataset(test_data)
         self.state_space = train_dataset.calculate_state_space
         self.be_ratio = torch.tensor(train_dataset.get_source_ratio, dtype=torch.float32).to(
@@ -121,7 +121,8 @@ class Train_Irl_model(Module):
                     print(f"Batch {epoch + 1}: Exception occurred - {str(e)}")
         self.plot_losses()
         # トレーニングが終了したら、最終エポックのモデルの重みを保存
-        self.test_plot()
+        score_data = self.test_plot()
+        return score_data
 
     def train_one_step(self):
         with tqdm(total=len(self.train_dataloader), desc="Train_one_step", leave=False) as pbar:
@@ -225,6 +226,7 @@ class Train_Irl_model(Module):
         plt.savefig(f"plot/{self.expert_id}/{self.group}_violinplot.png")
         plt.show()
         plt.close()
+        return list(data[data["Category"] == "expert"]["Score"])
 
     def plot_losses(self):
         # デバイスの確認（デバッグ用）

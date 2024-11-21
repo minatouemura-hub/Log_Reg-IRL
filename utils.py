@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from scipy.stats import mannwhitneyu, ttest_ind
 from tqdm import tqdm
 
 
@@ -9,6 +10,31 @@ def load_dataset(path, pbar_desc="Loading dataset"):
         for _ in range(len(dataset)):
             pbar.update(1)
     return dataset
+
+
+def certificate_diff(score_dict: dict, how: str = "mannehitneyu"):
+    if how == "ttest":
+        t_stat, p_value = ttest_ind(
+            score_dict["F_expert_score"], score_dict["M_expert_score"], equal_var=False
+        )
+        # 有意差の判定 (p値 < 0.05を有意水準とする例)
+
+    elif how == "mannehitneyu":
+        t_stat, p_value = mannwhitneyu(
+            score_dict["F_expert_score"], score_dict["M_expert_score"], alternative="two-sided"
+        )
+    print("t統計量:", t_stat)
+    print("p値:", p_value)
+    print("score in M:", sum(score_dict["M_expert_score"]))
+    print(
+        "score in F:",
+        sum(score_dict["F_expert_score"]),
+    )
+
+    if p_value < 0.05:
+        print("2つのデータセットの差は有意です。")
+    else:
+        print("2つのデータセットの差は有意ではありません。")
 
 
 def check_memory(device):

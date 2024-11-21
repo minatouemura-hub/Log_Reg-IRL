@@ -1,4 +1,5 @@
 import os
+import random
 
 import numpy as np
 import pandas as pd
@@ -29,8 +30,10 @@ def make_irl_dataset(BasePath, expert_path, max_num):
 def load_npy_files(directory, exclude: str, max_num: int = 100):
     npy_files = []
     count = 0
+    filenames = os.listdir(directory)
+    random.shuffle(filenames)
     # ディレクトリ内のファイルをチェック
-    for filename in os.listdir(directory):
+    for filename in filenames:
         # .npyファイルかつ指定された除外条件に一致しない場合
         if filename.endswith(".npy") and exclude not in filename:
             file_path = os.path.join(directory, filename)
