@@ -73,15 +73,18 @@ class BookDataset(Dataset):
         return np.float32(self.source_counts[-1] / self.source_counts[1])
 
     @property
-    def StateSize(self):
-        state = self.data.loc[0, "state"]
-        print(state.ndim)
-        return state.shape
-
-    @property
     def calculate_state_space(self):
         # 最初の行のstateが2次元配列か1次元配列か確認
-        state = self.data.loc[0, "state"]
+        if "state" not in self.data.columns:
+            raise KeyError("The 'state' column is missing in the data.")
+
+        if 0 not in self.data.index:
+            self.data.reset_index(drop=True, inplace=True)
+
+        if not self.data.empty:
+            state = self.data.loc[0, "state"]
+        else:
+            raise ValueError("The data is empty!")
 
         if isinstance(state, np.ndarray):
             if state.ndim == 1:  # 1次元配列の場合

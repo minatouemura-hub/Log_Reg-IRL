@@ -96,9 +96,9 @@ class Train_Irl_model(Module):
         self.v_optim = Adagrad(self.irl_model.state_value_net.parameters(), lr=self.lr)
 
         # trainの開始
-        print(f"----Training on {self.device}----")
         self.irl_model.train()
-        with tqdm(total=self.num_epoch, desc="Epoch") as pbar:
+        with tqdm(total=self.num_epoch, desc="Epoch", leave=False) as pbar:
+            tqdm.write(f"----Training on {self.device}----")
             for epoch in range(self.num_epoch):
                 try:
                     total_loss = self.train_one_step()
@@ -114,11 +114,13 @@ class Train_Irl_model(Module):
                     else:
                         epochs_no_improve += 1
                     if epochs_no_improve >= patiance:
-                        print(f"Early stopping at epoch {epoch + 1}")
+                        tqdm.write(f"Early stopping at epoch {epoch + 1}")
                         break
-                    pbar.update(1)
                 except Exception as e:
-                    print(f"Batch {epoch + 1}: Exception occurred - {str(e)}")
+                    tqdm.write(f"Batch {epoch + 1}: Exception occurred - {str(e)}")
+
+                finally:
+                    pbar.close()
         self.plot_losses()
         # トレーニングが終了したら、最終エポックのモデルの重みを保存
         score_data = self.test_plot()
@@ -184,11 +186,11 @@ class Train_Irl_model(Module):
                     self.v_optim.step()
 
                     pbar.set_postfix({"Total Loss": f"{total_loss.item():.4f}"})
-                    pbar.update(1)
 
                 except Exception as e:
                     print(f"Batch {batch_idx + 1}: Exception occurred - {str(e)}")
                     traceback.print_exc()
+                pbar.update(1)
         return total_loss
 
     def test_plot(self):
@@ -224,9 +226,8 @@ class Train_Irl_model(Module):
         if not os.path.exists(f"plot/{self.expert_id}"):
             os.makedirs(f"plot/{self.expert_id}")
         plt.savefig(f"plot/{self.expert_id}/{self.group}_violinplot.png")
-        plt.show()
         plt.close()
-        return list(data[data["Category"] == "expert"]["Score"])
+        return sum(data[data["Category"] == "expert"]["Score"])
 
     def plot_losses(self):
         # デバイスの確認（デバッグ用）
@@ -236,7 +237,6 @@ class Train_Irl_model(Module):
         plt.ylabel("Loss")
         plt.title("Training Loss Over Time")
         plt.legend()
-        plt.show()
         plt.close()
 
     # def get_gender_label(self, target_id: str):

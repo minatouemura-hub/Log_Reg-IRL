@@ -1,4 +1,11 @@
+import os
+import random
+import re
+
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn as sns
 import torch
 from scipy.stats import mannwhitneyu, ttest_ind
 from tqdm import tqdm
@@ -12,29 +19,96 @@ def load_dataset(path, pbar_desc="Loading dataset"):
     return dataset
 
 
-def certificate_diff(score_dict: dict, how: str = "mannehitneyu"):
+def choose_expert_data(directory_path: str, num: int):
+    files = os.listdir(directory_path)
+    files = extract_numbers_from_strings(files)
+    sampled_number = random.sample(files, num)
+    return sampled_number
+
+
+def Gender_Rate(d_score, s_score, target_gender: str = "F"):
+    if target_gender == "F":
+        gr = (d_score - s_score) / d_score  # どの程度，その性別らしいか
+    else:
+        gr = (s_score - d_score) / d_score  # 男性の場合は-1倍することで同じスペクトラムで表現
+    return gr
+
+
+def plot_GenderRate(num: int, two_score_dict: dict, target_gender: str):
+    d_scores = np.array(two_score_dict["D_expert_score"])
+    s_scores = np.array(two_score_dict["S_expert_score"])
+    if target_gender == "F":
+        gr = (
+            d_scores - s_scores
+        ) / d_scores  # 変化量*-1 自身の性別らしさからどの程度変化しているのか
+        label = sum(1 for x in gr if x > 0)
+    if target_gender == "M":
+        gr = (s_scores - d_scores) / d_scores  # 変化量
+        label = sum(1 for x in gr if x < 0)
+    accuracy = float(label / num)
+    # ヒストグラムのプロット
+    sns.histplot(gr, bins=8, binrange=(-1, 1), kde=False, color="gray", edgecolor="black")
+    # 軸ラベルとタイトル
+    plt.xlabel("Value Range")  # X軸のラベル
+    plt.ylabel("Frequency")  # Y軸のラベル
+    plt.title("Histogram of List Data")  # タイトル
+    # グラフの表示
+    plt.grid(True, linestyle="--", alpha=0.7)
+    plt.savefig(f"./plot/{target_gender}/gr_plot.png")
+    plt.close()
+    return accuracy
+
+
+def extract_numbers_from_strings(strings):
+    numbers = []
+    for string in strings:
+        # 正規表現で数字を検索
+        match = re.search(r"\d+", string)
+        if match:
+            numbers.append(int(match.group()))  # 数字をリストに追加
+    return numbers
+
+
+def certificate_diff(score_dict: dict, target: str, how: str = "mannehitneyu"):
     if how == "ttest":
-        t_stat, p_value = ttest_ind(
-            score_dict["F_expert_score"], score_dict["M_expert_score"], equal_var=False
+        stat, p_value = ttest_ind(
+            score_dict["D_expert_score"], score_dict["S_expert_score"], equal_var=False
         )
         # 有意差の判定 (p値 < 0.05を有意水準とする例)
 
     elif how == "mannehitneyu":
-        t_stat, p_value = mannwhitneyu(
-            score_dict["F_expert_score"], score_dict["M_expert_score"], alternative="two-sided"
+        stat, p_value = mannwhitneyu(
+            score_dict["D_expert_score"], score_dict["S_expert_score"], alternative="two-sided"
         )
-    print("t統計量:", t_stat)
-    print("p値:", p_value)
-    print("score in M:", sum(score_dict["M_expert_score"]))
-    print(
-        "score in F:",
-        sum(score_dict["F_expert_score"]),
-    )
-
-    if p_value < 0.05:
-        print("2つのデータセットの差は有意です。")
+    if target == "M":
+        other = "F"
     else:
-        print("2つのデータセットの差は有意ではありません。")
+        other = "M"
+    summary_data = {
+        "Metric": ["Mean", "Variance", "Statistic", "P-Value", "Conclusion", "How"],
+        target: [
+            round(np.mean(score_dict["D_expert_score"]), 2),
+            round(np.var(score_dict["D_expert_score"], ddof=1), 2),
+            stat,
+            p_value,
+            "Significant" if p_value < 0.05 else "Not Significant",
+            how,
+        ],
+        other: [
+            round(np.mean(score_dict["S_expert_score"]), 2),
+            round(np.var(score_dict["S_expert_score"], ddof=1), 2),
+            None,
+            None,
+            None,
+            None,
+        ],
+    }
+
+    # DataFrameに変換
+    results_df = pd.DataFrame(summary_data)
+
+    # CSV形式で保存
+    results_df.to_csv(f"./table/{how}_results.csv", index=False)
 
 
 def check_memory(device):
