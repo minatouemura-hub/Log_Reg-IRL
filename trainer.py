@@ -122,7 +122,7 @@ class Train_Irl_model(Module):
         self.plot_losses()
         # トレーニングが終了したら、最終エポックのモデルの重みを保存
         score_data = self.test_plot()
-        self.save_expert_scores_with_cumulative_data()
+        self.save_expert_scores()
         return score_data
 
     def train_one_step(self):
@@ -280,8 +280,6 @@ class Train_Irl_model(Module):
         plt.grid(True)
         plt.savefig(f"{save_dir}/{self.group}_expert_scores_plot.png")
         plt.close()
-
-        return scores_df
 
     def save_expert_scores_with_cumulative_data(self):
         self.irl_model.eval()  # モデルを評価モードに設定
