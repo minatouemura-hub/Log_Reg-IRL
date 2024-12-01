@@ -100,6 +100,7 @@ class Train_Irl_model(Module):
         with tqdm(total=self.num_epoch, desc="Epoch", leave=False) as pbar:
             tqdm.write(f"----Training on {self.device}----")
             for epoch in range(self.num_epoch):
+                total_loss = 0
                 try:
                     total_loss = self.train_one_step()
                     self.epoch_losses.append(total_loss.cpu().detach().numpy())

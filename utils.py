@@ -27,24 +27,28 @@ def choose_expert_data(directory_path: str, num: int):
 
 
 def Gender_Rate(d_score, s_score, target_gender: str = "F"):
+    d_score = max(d_score, 0)
+    s_score = max(s_score, 0)
+    if d_score == 0:
+        if target_gender == "F":
+            return np.clip(s_score, 0, 1)
+        else:
+            return np.clip(s_score, 0, -1)
     if target_gender == "F":
-        gr = (d_score - s_score) / d_score  # どの程度，その性別らしいか
+        gr = (d_score - s_score) / d_score  # 女性らしさ
     else:
-        gr = (s_score - d_score) / d_score  # 男性の場合は-1倍することで同じスペクトラムで表現
+        gr = (s_score - d_score) / d_score  # 男性らしさ
     return gr
 
 
 def plot_GenderRate(num: int, two_score_dict: dict, target_gender: str):
     d_scores = np.array(two_score_dict["D_expert_score"])
     s_scores = np.array(two_score_dict["S_expert_score"])
-    if target_gender == "F":
-        gr = (
-            d_scores - s_scores
-        ) / d_scores  # 変化量*-1 自身の性別らしさからどの程度変化しているのか
-        label = sum(1 for x in gr if x > 0)
-    if target_gender == "M":
-        gr = (s_scores - d_scores) / d_scores  # 変化量
-        label = sum(1 for x in gr if x < 0)
+
+    # Gender_Rateを計算（Min-Maxスケーリングを適用）
+    gr = np.array([Gender_Rate(d, s, target_gender) for d, s in zip(d_scores, s_scores)])
+    # ラベル計算
+    label = sum(1 for x in gr if x > 0) if target_gender == "F" else sum(1 for x in gr if x < 0)
     accuracy = float(label / num)
     # ヒストグラムのプロット
     sns.histplot(gr, bins=8, binrange=(-1, 1), kde=False, color="gray", edgecolor="black")
