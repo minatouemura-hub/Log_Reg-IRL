@@ -1,17 +1,18 @@
 import json
 import os
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import t
 from sklearn.linear_model import LinearRegression  # noqa
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.tree import DecisionTreeRegressor
+from sklearn.tree import DecisionTreeRegressor, plot_tree
 
 
 class MakeDataSet:
-    def __init__(self, json_file_path: str, label: int, SexDataset: pd.DataFrame):
+    def __init__(self, json_file_path: str, label: float, SexDataset: pd.DataFrame):
         try:
             with open(json_file_path, "r") as f:
                 self.SexRates = pd.DataFrame(json.load(f))
@@ -87,9 +88,9 @@ class Verify:
         # ファイル名に基づいてラベルを設定
         for json_file_path in self.json_files:
             if "M" in json_file_path:
-                label = -1
+                label = np.random.uniform(-1, 0)
             elif "F" in json_file_path:
-                label = 1
+                label = np.random.uniform(0, 1)
             else:
                 raise ValueError(f"File name does not contain 'M' or 'F': {json_file_path}")
             makedata = MakeDataSet(json_file_path=json_file_path, label=label, SexDataset=S_dataset)
@@ -153,13 +154,18 @@ class Verify:
             X = dataset[[feature]]
             y = dataset[target]
 
-            model = DecisionTreeRegressor(random_state=42)
+            model = DecisionTreeRegressor(random_state=42, max_depth=4)
             model.fit(X, y)
 
             y_pred = model.predict(X)
             r2 = r2_score(y, y_pred)
             mse = mean_squared_error(y, y_pred)
 
+            # 決定木を可視化
+            plt.figure(figsize=(12, 8))
+            plot_tree(model, feature_names=list(X.columns), filled=True, rounded=True)
+            plt.title(f"Decision Tree for {feature}")
+            plt.show()
             results[feature] = {
                 "R²": r2,
                 "MSE": mse,

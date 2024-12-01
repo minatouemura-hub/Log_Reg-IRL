@@ -8,8 +8,6 @@ import pandas as pd
 import seaborn as sns
 import torch
 import torch.nn.functional as F  # noqa
-import torch.utils
-from sklearn.model_selection import train_test_split
 from torch.nn import Module
 from torch.optim import Adagrad
 from torch.utils.data import DataLoader
@@ -60,9 +58,8 @@ class Train_Irl_model(Module):
         # 設定&データの処理
         expert_path = self.search_ExpertPath(self.expert_id)
         BathPath = f"/Users/uemuraminato/Desktop/book_script/vec/preproceed/{self.group}/"
-        combined_dataset = make_irl_dataset(expert_path=expert_path, BasePath=BathPath, max_num=20)
-        train_data, test_data = train_test_split(
-            combined_dataset, test_size=0.2, stratify=combined_dataset["source"]
+        train_data, test_data = make_irl_dataset(
+            expert_path=expert_path, BasePath=BathPath, max_num=20
         )
         train_dataset = BookDataset(train_data)
         self.test_dataset = BookDataset(test_data)
@@ -125,6 +122,7 @@ class Train_Irl_model(Module):
         self.plot_losses()
         # トレーニングが終了したら、最終エポックのモデルの重みを保存
         score_data = self.test_plot()
+        self.save_expert_scores_with_cumulative_data()
         return score_data
 
     def train_one_step(self):
@@ -240,5 +238,100 @@ class Train_Irl_model(Module):
         plt.legend()
         plt.close()
 
-    # def get_gender_label(self, target_id: str):
-    #     target_dir_path = ""
+    # 時系列的に扱うために追加
+    def save_expert_scores(self):
+        self.irl_model.eval()  # モデルを評価モードに設定
+        test_dataloader = DataLoader(
+            self.test_dataset,
+            batch_size=1,  # 1つずつ処理
+            collate_fn=custom_collate_fun,
+        )
+
+        scores = []  # スコアを格納するリスト
+        indices = []  # 時系列順のインデックスを保持
+
+        # 時系列順に処理
+        for idx, (state, next_state, source) in enumerate(test_dataloader):
+            state = state.unsqueeze(1).to(self.device)
+            source = source.to(self.device)
+
+            # expert のスコアのみ計算
+            if source.item() == 1:  # source が expert の場合
+                expert_score = float(self.irl_model.reward_net(state).detach().cpu())
+                scores.append(expert_score)
+                indices.append(idx)
+
+        # 保存先のディレクトリを確認または作成
+        save_dir = f"plot/{self.expert_id}"
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        # 時系列スコアをCSVに保存
+        scores_df = pd.DataFrame({"Index": indices, "Expert_Score": scores})
+        scores_df.to_csv(f"{save_dir}/{self.group}_expert_scores.csv", index=False)
+
+        # スコアの推移をプロット
+        plt.figure(figsize=(10, 6))
+        plt.plot(indices, scores, marker="o", label="Expert Scores")
+        plt.title(f"Time Series of Expert Scores in {self.group}")
+        plt.xlabel("Time Index")
+        plt.ylabel("Score")
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(f"{save_dir}/{self.group}_expert_scores_plot.png")
+        plt.close()
+
+        return scores_df
+
+    def save_expert_scores_with_cumulative_data(self):
+        self.irl_model.eval()  # モデルを評価モードに設定
+
+        # 初期化
+        cumulative_states = []  # 前の期のデータを保持
+        scores = []  # 各期のスコアを格納
+        indices = []  # 時系列順のインデックスを保持
+
+        # テストデータのデータローダー
+        test_dataloader = DataLoader(
+            self.test_dataset,
+            batch_size=1,  # 1つずつ処理
+            collate_fn=custom_collate_fun,
+        )
+
+        # 時系列処理
+        for idx, (state, _, source) in enumerate(test_dataloader):
+            state = state.unsqueeze(1).to(self.device)
+            source = source.to(self.device)
+
+            # データを累積
+            if source.item() == 1:  # source が expert の場合
+                cumulative_states.append(state)
+
+            # 累積データをまとめてスコア計算
+            if len(cumulative_states) > 0:
+                cumulative_tensor = torch.cat(cumulative_states, dim=0)  # 累積データをテンソル化
+                batch_expert_score = float(
+                    torch.sum(self.irl_model.reward_net(cumulative_tensor)).detach().cpu()
+                )
+                scores.append(batch_expert_score)
+                indices.append(idx)
+
+        # 保存先のディレクトリを確認または作成
+        save_dir = f"plot/{self.expert_id}"
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        # 時系列スコアをCSVに保存
+        scores_df = pd.DataFrame({"Index": indices, "Cumulative_Expert_Score": scores})
+        scores_df.to_csv(f"{save_dir}/{self.group}_cumulative_expert_scores.csv", index=False)
+
+        # スコアの推移をプロット
+        plt.figure(figsize=(10, 6))
+        plt.plot(indices, scores, marker="o", label="Cumulative Expert Scores")
+        plt.title(f"Cumulative Time Series of Expert Scores in {self.group}")
+        plt.xlabel("Time Index")
+        plt.ylabel("Cumulative Score")
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(f"{save_dir}/{self.group}_cumulative_expert_scores_plot.png")
+        plt.close()
