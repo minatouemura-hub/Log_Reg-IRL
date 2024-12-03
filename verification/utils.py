@@ -30,6 +30,13 @@ class MakeDataSet:
             # word2vecの結果でもいいかな
             np_vec_path = self.search_ExpertPath(search_id=str(target_id))
             np_vec = np.load(np_vec_path)
+            # 配列全体のサイズ
+            total_length = np_vec.shape[0]
+
+            start_index = int(total_length * 0.8)
+            # 検証(未知)データを対象に予測
+            np_vec = np_vec[start_index:]
+
             cos_mean, cos_var, count = self.calc_cos_data(dataset=np_vec)
             target_data = pd.DataFrame(
                 [[self.label, sr, cos_mean, cos_var, count]],
@@ -59,7 +66,7 @@ class MakeDataSet:
             raise ValueError(f"No {search_id} files")
 
 
-class Verify:
+class StaticalVerify:
     def __init__(self, json_files: list):
         self.json_files = json_files
 
@@ -165,17 +172,11 @@ class Verify:
             plt.figure(figsize=(12, 8))
             plot_tree(model, feature_names=list(X.columns), filled=True, rounded=True)
             plt.title(f"Decision Tree for {feature}")
-            plt.show()
+            if feature == "SSex":
+                plt.savefig("verification/plt/decison_tree_reg.png")
+            plt.close()
             results[feature] = {
                 "R²": r2,
                 "MSE": mse,
             }
         return results
-
-
-json_files = [
-    "/Users/uemuraminato/Desktop/IRL/plot/M_gr_list.json",
-    "/Users/uemuraminato/Desktop/IRL/plot/F_gr_list.json",
-]
-ver = Verify(json_files=json_files)
-S_dataset = ver.execute()

@@ -1,7 +1,7 @@
 Metric,F,M
-Mean,99.18,
-Variance,2330.99,
-Statistic,,
-P-Value,,
-Conclusion,Not Significant,
+Mean,127.04,37.59
+Variance,3522.64,9562.96
+Statistic,4.282929780377881,
+P-Value,8.842978442089444e-05,
+Conclusion,Significant,
 How,ttest,

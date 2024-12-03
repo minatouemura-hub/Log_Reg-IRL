@@ -4,3 +4,5 @@ dataset/
 weight_vec/
 mapping/figure/
 mapping/ind/
+verification/plt
+table/ttest_results.csv
