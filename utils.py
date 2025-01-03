@@ -27,13 +27,11 @@ def choose_expert_data(directory_path: str, num: int):
 
 
 def Gender_Rate(d_score, s_score, target_gender: str = "F"):
-    d_score = max(d_score, 0)
-    s_score = max(s_score, 0)
     if d_score == 0:
         if target_gender == "F":
-            return np.clip(s_score, 0, 1)
+            return None
         else:
-            return np.clip(s_score, 0, -1)
+            return None
     if target_gender == "F":
         gr = (d_score - s_score) / d_score  # 女性らしさ
     else:
@@ -42,19 +40,24 @@ def Gender_Rate(d_score, s_score, target_gender: str = "F"):
 
 
 def plot_GenderRate(num: int, two_score_dict: dict, target_gender: str):
-    d_scores = np.array(two_score_dict["D_expert_score"])
-    s_scores = np.array(two_score_dict["S_expert_score"])
+    d_scores = np.array(two_score_dict["d_score"])
+    s_scores = np.array(two_score_dict["s_score"])
 
-    # Gender_Rateを計算（Min-Maxスケーリングを適用）
-    gr = np.array([Gender_Rate(d, s, target_gender) for d, s in zip(d_scores, s_scores)])
+    gr = np.array([d - s for d, s in zip(d_scores, s_scores)])
+
     # ラベル計算
     label = sum(1 for x in gr if x > 0) if target_gender == "F" else sum(1 for x in gr if x < 0)
     accuracy = float(label / num)
     # ヒストグラムのプロット
-    sns.histplot(gr, bins=8, binrange=(-1, 1), kde=False, color="gray", edgecolor="black")
+    bins = np.linspace(start=-3, stop=3, num=9)
+    sns.histplot(gr, bins=bins, kde=False, color="gray", edgecolor="black")
     # 軸ラベルとタイトル
     plt.xlabel("Value Range")  # X軸のラベル
-    plt.ylabel("Frequency")  # Y軸のラベル
+
+    plt.ylabel("Frequency")
+    max_y = plt.gca().get_ylim()[1]  # y軸の最大値を取得
+    plt.yticks(np.arange(0, max_y + 1, 5))
+
     plt.title("Histogram of List Data")  # タイトル
     # グラフの表示
     plt.grid(True, linestyle="--", alpha=0.7)
@@ -74,33 +77,47 @@ def extract_numbers_from_strings(strings):
 
 
 def certificate_diff(score_dict: dict, target: str, how: str = "mannehitneyu"):
+    """
+    統計検定を行い、結果をCSVとして保存する関数。
+    欠損値がある場合は事前に削除する。
+    """
+    # 欠損値の削除
+    df = pd.DataFrame(score_dict).dropna()
+    cleaned_score_dict = {
+        "D_expert_score": df["D_expert_score"].tolist(),
+        "S_expert_score": df["S_expert_score"].tolist(),
+    }
+
+    # 検定の実行
     if how == "ttest":
         stat, p_value = ttest_ind(
-            score_dict["D_expert_score"], score_dict["S_expert_score"], equal_var=False
+            cleaned_score_dict["D_expert_score"],
+            cleaned_score_dict["S_expert_score"],
+            equal_var=False,
         )
-        # 有意差の判定 (p値 < 0.05を有意水準とする例)
-
     elif how == "mannehitneyu":
         stat, p_value = mannwhitneyu(
-            score_dict["D_expert_score"], score_dict["S_expert_score"], alternative="two-sided"
+            cleaned_score_dict["D_expert_score"],
+            cleaned_score_dict["S_expert_score"],
+            alternative="two-sided",
         )
-    if target == "M":
-        other = "F"
     else:
-        other = "M"
+        raise ValueError("Invalid method. Use 'ttest' or 'mannehitneyu'.")
+
+    # 結果のまとめ
     summary_data = {
         "Metric": ["Mean", "Variance", "Statistic", "P-Value", "Conclusion", "How"],
-        target: [
-            round(np.mean(score_dict["D_expert_score"]), 2),
-            round(np.var(score_dict["D_expert_score"], ddof=1), 2),
+        "D_expert_score": [
+            round(np.mean(cleaned_score_dict["D_expert_score"]), 2),
+            round(np.var(cleaned_score_dict["D_expert_score"], ddof=1), 2),
             stat,
             p_value,
             "Significant" if p_value < 0.05 else "Not Significant",
             how,
         ],
-        other: [
-            round(np.mean(score_dict["S_expert_score"]), 2),
-            round(np.var(score_dict["S_expert_score"], ddof=1), 2),
+        "S_expert_score": [
+            round(np.mean(cleaned_score_dict["S_expert_score"]), 2),
+            round(np.var(cleaned_score_dict["S_expert_score"], ddof=1), 2),
             None,
             None,
             None,
@@ -108,117 +125,8 @@ def certificate_diff(score_dict: dict, target: str, how: str = "mannehitneyu"):
         ],
     }
 
-    # DataFrameに変換
+    # DataFrameに変換しCSVに保存
     results_df = pd.DataFrame(summary_data)
-
-    # CSV形式で保存
     results_df.to_csv(f"./table/{how}_results.csv", index=False)
 
-
-def check_memory(device):
-    if torch.backends.mps.is_available():
-        mem_info = torch.mps.current_allocated_memory()
-        print(f"Current allocated memory on MPS: {mem_info}")
-    else:
-        mem_info = torch.cuda.memory_allocated(device)
-        print(f"Current allocated memory on CUDA: {mem_info}")
-
-
-def stable_softmax(x):
-    shift_x = x - torch.max(x)
-    exps = torch.exp(shift_x)
-    softmax = exps / torch.sum(exps)
-    return softmax
-
-
-def sigmoid(x):
-    return np.array(1 / (1 + np.exp(-x)), dtype=np.float32)
-
-
-def sys_resampling(N, log_w):
-    # ログ重みを線形領域に戻す
-    w = np.exp(log_w)
-    # 重みを正規化する（合計が1になるように）
-    w /= np.sum(w)
-
-    # 系統リサンプリング用のインデックスを生成
-    positions = (np.arange(N) + np.random.uniform()) / N
-    indexes = np.zeros(N, "i")
-    cumulative_sum = np.cumsum(w)
-
-    i, j = 0, 0
-    while i < N:
-        if positions[i] < cumulative_sum[j]:
-            indexes[i] = j
-            i += 1
-        else:
-            j += 1
-    return indexes
-
-
-# 状況の設定のみ
-class GridWorld:
-    def __init__(self):
-        self.action_space = [0, 1, 2, 3]
-        self.action_meaning = {
-            0: "UP",
-            1: "DOWN",
-            2: "LEFT",
-            3: "RIGHT",
-        }
-
-        self.reward_map = np.array([[0, 0, 0, 1.0], [0, None, 0, -1.0], [0, 0, 0, 0]])
-        self.goal_state = (0, 3)
-        self.wall_state = (1, 1)
-        self.start_state = (2, 0)
-        self.agent_state = self.start_state
-
-    @property
-    def height(self):
-        return len(self.reward_map)
-
-    @property
-    def width(self):
-        return len(self.reward_map[0])
-
-    @property
-    def shape(self):
-        return self.reward_map.shape
-
-    def actions(self):
-        return self.action_space
-
-    def states(self):
-        for h in range(self.height):
-            for w in range(self.width):
-                yield (h, w)
-
-    # 環境の状態遷移を表す関数
-    def next_state(self, state, action):
-        action_move_map = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        move = action_move_map[action]
-        next_state = (state[0] + move[0], state[1] + move[1])
-        ny, nx = next_state
-
-        if nx < 0 or nx >= self.width or ny < 0 or ny >= self.height:
-            next_state = state
-        elif next_state == self.wall_state:
-            next_state = state
-
-        return next_state
-
-    def reward(self, state, action, next_state):
-        return self.reward_map[next_state]
-
-    def reset(self):
-        self.agent_state = self.start_state
-        return self.agent_state
-
-    def step(self, action):
-        state = self.agent_state
-        next_state = self.next_state(state, action)
-        reward = self.reward(state, action, next_state)
-        done = next_state == self.goal_state
-
-        self.agent_state = next_state
-        return next_state, reward, done
+    print("統計検定が完了し、結果が保存されました。")

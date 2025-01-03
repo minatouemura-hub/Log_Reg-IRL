@@ -79,11 +79,15 @@ class Train_Irl_model(Module):
         epochs_no_improve = 0
 
         # モデルの初期化
-        self.irl_model = Irl_Net(
-            device=self.device,
-            action_num=self.action_num,
-            state_space=self.state_space,
-        ).to(self.device)
+        self.irl_model = (
+            Irl_Net(
+                device=self.device,
+                action_num=self.action_num,
+                state_space=self.state_space,
+            )
+            .to(torch.float32)
+            .to(self.device)
+        )
 
         self.dens_optim = Adagrad(
             self.irl_model.dens_net.parameters(),
@@ -97,7 +101,7 @@ class Train_Irl_model(Module):
         with tqdm(total=self.num_epoch, desc="Epoch", leave=False) as pbar:
             tqdm.write(f"----Training on {self.device}----")
             for epoch in range(self.num_epoch):
-                total_loss = 0
+                total_loss = 10
                 try:
                     total_loss = self.train_one_step()
                     self.epoch_losses.append(total_loss.cpu().detach().numpy())
@@ -126,6 +130,7 @@ class Train_Irl_model(Module):
         return score_data
 
     def train_one_step(self):
+        total_loss = 10
         with tqdm(total=len(self.train_dataloader), desc="Train_one_step", leave=False) as pbar:
             self.irl_model.train()
             for batch_idx, (states, next_states, sources) in enumerate(self.train_dataloader):
@@ -171,10 +176,10 @@ class Train_Irl_model(Module):
                         lambda_reg=self.lambda_reg,
                         model=self.irl_model.state_value_net,
                     )
-                    if torch.isnan(dens_loss) or torch.isnan(q_loss) or torch.isnan(v_loss):
-                        continue
 
                     total_loss = q_loss + v_loss + dens_loss
+                    if torch.isnan(dens_loss) or torch.isnan(q_loss) or torch.isnan(v_loss):
+                        continue
 
                     # lossによる逆順伝播
                     total_loss.backward()
